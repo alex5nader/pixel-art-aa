@@ -1,12 +1,12 @@
 [package]
-name = "turnbased"
+name = "pixel-art-aa"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = "0.11.3"
+bevy = { path = "../bevy" }
 
 [dev-dependencies]
-bevy = { version = "0.11.3", features = ["dynamic_linking"] }
+bevy = { path = "../bevy", features = ["dynamic_linking"] }
