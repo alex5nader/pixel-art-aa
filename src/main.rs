@@ -1,6 +1,7 @@
 use bevy::{
-    core_pipeline::clear_color::ClearColorConfig,
+    asset::RenderAssetUsages,
     prelude::*,
+    pbr::TextureSampler,
     render::{mesh::Indices, render_resource::PrimitiveTopology},
 };
 
@@ -21,7 +22,7 @@ fn setup(
     let pixel_art_material = materials.add(StandardMaterial {
         alpha_mode: AlphaMode::Mask(0.5),
         base_color_texture: Some(asset_server.load("bevy_pixel_dark.png")),
-        pixel_art_anti_aliasing: true,
+        texture_sampler: TextureSampler::PixelArt,
         cull_mode: None,
         ..default()
     });
@@ -35,12 +36,10 @@ fn setup(
 
     // camera
     commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(-2.0, 1.5, 2.0).looking_at(Vec3::ZERO, Vec3::Y),
-            camera_3d: Camera3d {
-                clear_color: ClearColorConfig::Custom(Color::rgb(0.1, 0.3, 0.5)),
-                ..default()
-            },
+        Transform::from_xyz(-2.0, 1.5, 2.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Camera3d::default(),
+        Camera {
+            clear_color: ClearColorConfig::Custom(Color::srgb(0.1, 0.3, 0.5)),
             ..default()
         },
         SpinCamera {
@@ -51,37 +50,31 @@ fn setup(
     ));
 
     // plane
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(shape::Plane::from_size(5.0).into()),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
-        ..default()
-    });
+    commands.spawn((
+        Mesh3d(meshes.add(Plane3d { normal: Dir3::Y, half_size: Vec2::splat(2.5) })),
+        MeshMaterial3d(materials.add(Color::srgb(0.3, 0.5, 0.3))),
+    ));
 
     // sprite
     commands.spawn((
         CurrentMaterial::PixelArt,
-        PbrBundle {
-            mesh: meshes.add(quad_mesh()),
-            material: pixel_art_material,
-            transform: Transform::from_xyz(0.0, 0.5, 0.0),
-            ..default()
-        },
+        Mesh3d(meshes.add(quad_mesh())),
+        MeshMaterial3d(pixel_art_material),
+        Transform::from_xyz(0.0, 0.5, 0.0),
     ));
 
     // light
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            intensity: 1500.0,
+    commands.spawn((
+        PointLight {
             shadows_enabled: true,
             ..default()
         },
-        transform: Transform::from_xyz(4.0, 8.0, 4.0),
-        ..default()
-    });
+        Transform::from_xyz(4.0, 8.0, 4.0),
+    ));
 }
 
 fn quad_mesh() -> Mesh {
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::RENDER_WORLD);
 
     #[rustfmt::skip]
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vec![
@@ -103,10 +96,10 @@ fn quad_mesh() -> Mesh {
     ]);
 
     #[rustfmt::skip]
-    mesh.set_indices(Some(Indices::U32(vec![
+    mesh.insert_indices(Indices::U32(vec![
         0, 1, 2,
         0, 2, 3,
-    ])));
+    ]));
 
     return mesh;
 }
@@ -123,21 +116,21 @@ enum CurrentMaterial {
 }
 
 fn swap_material(
-    mut sprites: Query<(&mut CurrentMaterial, &mut Handle<StandardMaterial>)>,
-    input: Res<Input<KeyCode>>,
-    pixel_art_handle: Res<PixelArtMaterial>,
-    normal_handle: Res<NormalMaterial>,
+    mut sprites: Query<(&mut CurrentMaterial, &mut MeshMaterial3d<StandardMaterial>)>,
+    input: Res<ButtonInput<KeyCode>>,
+    pixel_art_material: Res<PixelArtMaterial>,
+    normal_material: Res<NormalMaterial>,
 ) {
     if input.just_pressed(KeyCode::Space) {
-        for (mut current_material, mut handle) in &mut sprites {
+        for (mut current_material, mut material) in &mut sprites {
             match *current_material {
                 CurrentMaterial::PixelArt => {
                     *current_material = CurrentMaterial::Normal;
-                    *handle = normal_handle.clone();
+                    material.0 = normal_material.clone();
                 }
                 CurrentMaterial::Normal => {
                     *current_material = CurrentMaterial::PixelArt;
-                    *handle = pixel_art_handle.clone();
+                    material.0 = pixel_art_material.clone();
                 }
             }
         }
@@ -153,7 +146,7 @@ struct SpinCamera {
 
 fn spin_camera(mut cameras: Query<(&mut SpinCamera, &mut Transform)>, time: Res<Time>) {
     for (mut spin, mut transform) in &mut cameras {
-        spin.angle += std::f32::consts::FRAC_PI_8 * time.delta_seconds();
+        spin.angle += std::f32::consts::FRAC_PI_8 * time.delta_secs();
 
         let rotation = Quat::from_axis_angle(Vec3::Y, spin.angle);
 
